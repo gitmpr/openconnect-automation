@@ -5,7 +5,7 @@ Noninteractive VPN connection using [OpenConnect](https://www.infradead.org/open
 Invoked via a shell alias — no manual input required once configured.
 
 ```bash
-alias vpn='python3 /path/to/vpn-automation/openconnect_pexpect_nc.py'
+alias vpn='python3 /path/to/vpn-automation/openconnect_pexpect.py'
 ```
 
 ## How it works
@@ -136,7 +136,7 @@ sudo visudo -f /etc/sudoers.d/openconnect
 Add to `~/.bashrc` or `~/.zshrc`:
 
 ```bash
-alias vpn='python3 /path/to/vpn-automation/openconnect_pexpect_nc.py'
+alias vpn='python3 /path/to/vpn-automation/openconnect_pexpect.py'
 ```
 
 ## Usage
@@ -169,7 +169,7 @@ Ctrl+C   # disconnect and restore DNS
 
 | File | Purpose |
 |---|---|
-| `openconnect_pexpect_nc.py` | Main connection script |
+| `openconnect_pexpect.py` | Main connection script |
 | `config/vpn.conf.EXAMPLE` | Config template — copy to `vpn.conf` and fill in |
 | `bash_commands/totp_command.sh` | Example TOTP wrapper using oathtool + secret-tool |
 

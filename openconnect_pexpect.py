@@ -34,6 +34,19 @@ def log_error(msg):   print(f"{Colors.RED}[ERROR] {msg}{Colors.END}", flush=True
 def log_success(msg): print(f"{Colors.GREEN}[SUCCESS] {msg}{Colors.END}", flush=True)
 
 
+def check_already_running():
+    proc = subprocess.run(["pgrep", "-a", "openconnect"], capture_output=True, text=True, check=False)
+    if proc.returncode == 0:
+        pid_line = proc.stdout.strip().splitlines()[0]
+        return True, f"openconnect already running (pid {pid_line.split()[0]})"
+
+    tun = subprocess.run(["ip", "link", "show", "tun0"], capture_output=True, text=True, check=False)
+    if tun.returncode == 0:
+        return True, "tun0 interface already exists"
+
+    return False, ""
+
+
 def load_config():
     if not CONFIG_FILE.exists():
         log_error(f"Config file not found: {CONFIG_FILE}")
@@ -203,6 +216,12 @@ def main():
 
     if os.geteuid() == 0:
         log_error("Do not run as root. The script escalates via sudo only when needed.")
+        sys.exit(1)
+
+    already_running, reason = check_already_running()
+    if already_running:
+        log_warn(f"VPN is already connected ({reason}).")
+        log_info("Disconnect first with: sudo pkill openconnect")
         sys.exit(1)
 
     log_info(f"Running as user: {os.getenv('USER')}")
