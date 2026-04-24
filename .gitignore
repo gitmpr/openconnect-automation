@@ -1,6 +1,9 @@
 # User config with real credentials - copy from vpn.conf.EXAMPLE and fill in
 config/vpn.conf
 
+# Test output log
+test_connection.log
+
 # Never commit actual extracted secrets or QR export files
 *.json
 *.csv
