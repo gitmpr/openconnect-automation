@@ -35,9 +35,9 @@ pip install pexpect
 ### 1. Clone and configure
 
 ```bash
-git clone <repo-url> vpn-automation
+git clone https://github.com/gitmpr/vpn-automation
 cd vpn-automation
-cp config/vpn.conf config/vpn.conf   # already present - edit it directly
+cp config/vpn.conf.EXAMPLE config/vpn.conf
 ```
 
 Edit `config/vpn.conf` and fill in:
@@ -101,19 +101,20 @@ Both methods can be mixed (e.g., plain username, command-retrieved password).
 
 ### 3. Obtaining the TOTP base32 secret
 
-To extract the TOTP secret from a Google Authenticator export (QR code), use [extract_otp_secrets](https://github.com/scito/extract_otp_secrets):
+Use [extract_otp_secrets](https://github.com/scito/extract_otp_secrets) to pull the base32 secret out of a Google Authenticator QR export.
+
+Export the account from the Google Authenticator app as a QR code, then:
 
 ```bash
-# Export the account from Google Authenticator as a QR code, then:
-
-# Using the standalone binary (no Python env needed):
+# Standalone binary (no Python env needed) - download from the releases page:
+# https://github.com/scito/extract_otp_secrets/releases/latest
 ./extract_otp_secrets_linux_x86_64 qr-export.png
 
 # Or via Python:
 python3 extract_otp_secrets.py qr-export.png
 ```
 
-This outputs the base32 secret. Store it with `secret-tool` (Option A) or put it directly in the config (Option B).
+This prints the base32 secret. Store it with `secret-tool` (Option A) or put it directly in the config (Option B).
 
 ### 4. Passwordless sudo for openconnect
 
@@ -169,12 +170,14 @@ Ctrl+C   # disconnect and restore DNS
 | File | Purpose |
 |---|---|
 | `openconnect_pexpect_nc.py` | Main connection script |
-| `config/vpn.conf` | All environment-specific configuration |
+| `config/vpn.conf.EXAMPLE` | Config template — copy to `vpn.conf` and fill in |
 | `bash_commands/totp_command.sh` | Example TOTP wrapper using oathtool + secret-tool |
+
+`config/vpn.conf` (your filled-in copy) is gitignored and never committed.
 
 ## Security notes
 
-- `config/vpn.conf` ships with placeholder values only — no real credentials
+- `config/vpn.conf` is gitignored — your credentials stay local
 - If you store a plain-text password in the config, run `chmod 600 config/vpn.conf`
 - The keyring approach (Option A) keeps secrets off disk entirely
 - The sudoers rule should be scoped to `/usr/sbin/openconnect` only
