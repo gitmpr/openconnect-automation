@@ -1,0 +1,12 @@
+# Never commit actual extracted secrets or QR export files
+*.json
+*.csv
+*.png
+*.jpeg
+*.jpg
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
