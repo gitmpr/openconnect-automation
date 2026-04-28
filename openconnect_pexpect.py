@@ -57,32 +57,39 @@ def load_config():
 
 
 def get_credential(config, section, plain_key, cmd_key, label):
-    """Return a credential value from config.
+    has_plain = config.has_option(section, plain_key)
+    has_cmd   = config.has_option(section, cmd_key)
 
-    Tries plain_key first (literal value); falls back to cmd_key (shell command
-    whose stdout is the credential). Exits if neither is configured.
-    """
-    if config.has_option(section, plain_key):
+    if has_plain and has_cmd:
+        log_error(f"Ambiguous {label} config: set either '{plain_key}' or '{cmd_key}' in [{section}], not both.")
+        sys.exit(1)
+    if not has_plain and not has_cmd:
+        log_error(f"No {label} configured. Set either '{plain_key}' or '{cmd_key}' in [{section}].")
+        sys.exit(1)
+
+    if has_plain:
         return config.get(section, plain_key)
-    if config.has_option(section, cmd_key):
-        cmd = config.get(section, cmd_key)
-        try:
-            return subprocess.check_output(cmd, shell=True, text=True).strip()
-        except subprocess.CalledProcessError as e:
-            log_error(f"Command for {label} failed: {e}")
-            sys.exit(1)
-    log_error(f"No {label} configured. Set either '{plain_key}' or '{cmd_key}' in [{section}].")
-    sys.exit(1)
+
+    cmd = config.get(section, cmd_key)
+    try:
+        return subprocess.check_output(cmd, shell=True, text=True).strip()
+    except subprocess.CalledProcessError as e:
+        log_error(f"Command for {label} failed: {e}")
+        sys.exit(1)
 
 
 def get_totp_code(config):
-    """Generate a TOTP code from config.
+    has_secret = config.has_option('credentials', 'totp_secret')
+    has_cmd    = config.has_option('credentials', 'totp_code_cmd')
 
-    Supports two methods:
-    - totp_secret: raw base32 secret; generates code via oathtool
-    - totp_code_cmd: shell command that outputs the current code
-    """
-    if config.has_option('credentials', 'totp_secret'):
+    if has_secret and has_cmd:
+        log_error("Ambiguous TOTP config: set either 'totp_secret' or 'totp_code_cmd' in [credentials], not both.")
+        sys.exit(1)
+    if not has_secret and not has_cmd:
+        log_error("No TOTP method configured. Set either 'totp_secret' or 'totp_code_cmd' in [credentials].")
+        sys.exit(1)
+
+    if has_secret:
         secret = config.get('credentials', 'totp_secret')
         try:
             return subprocess.check_output(
@@ -91,15 +98,13 @@ def get_totp_code(config):
         except subprocess.CalledProcessError as e:
             log_error(f"oathtool failed: {e}")
             sys.exit(1)
-    if config.has_option('credentials', 'totp_code_cmd'):
-        cmd = config.get('credentials', 'totp_code_cmd')
-        try:
-            return subprocess.check_output(cmd, shell=True, text=True).strip()
-        except subprocess.CalledProcessError as e:
-            log_error(f"TOTP command failed: {e}")
-            sys.exit(1)
-    log_error("No TOTP method configured. Set 'totp_secret' or 'totp_code_cmd' in [credentials].")
-    sys.exit(1)
+
+    cmd = config.get('credentials', 'totp_code_cmd')
+    try:
+        return subprocess.check_output(cmd, shell=True, text=True).strip()
+    except subprocess.CalledProcessError as e:
+        log_error(f"TOTP command failed: {e}")
+        sys.exit(1)
 
 
 def backup_dns_state():
