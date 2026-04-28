@@ -155,9 +155,12 @@ def configure_vpn_dns(config):
             log_warn("tun0 interface not found - DNS configuration skipped")
             return False
 
+        if not config.has_section('dns_servers'):
+            log_info("No [dns_servers] configured - skipping DNS configuration")
+            return False
+
         vpn_dns = [config.get('dns_servers', 'primary'),
                    config.get('dns_servers', 'secondary')]
-        domains = [d.strip() for d in config.get('search_domains', 'domains').split(',')]
 
         dns_result = subprocess.run(["resolvectl", "dns", "tun0"] + vpn_dns,
                                     capture_output=True, text=True, check=False)
@@ -166,13 +169,17 @@ def configure_vpn_dns(config):
             return False
         log_success(f"Set VPN DNS servers: {vpn_dns}")
 
-        all_domains = [f"~{d}" for d in domains] + domains
-        domain_result = subprocess.run(["resolvectl", "domain", "tun0"] + all_domains,
-                                       capture_output=True, text=True, check=False)
-        if domain_result.returncode != 0:
-            log_error(f"Failed to set VPN domains: {domain_result.stderr.strip()}")
-            return False
-        log_success(f"Set {len(domains)} routing/search domains on tun0")
+        if config.has_section('search_domains') and config.has_option('search_domains', 'domains'):
+            domains = [d.strip() for d in config.get('search_domains', 'domains').split(',')]
+            all_domains = [f"~{d}" for d in domains] + domains
+            domain_result = subprocess.run(["resolvectl", "domain", "tun0"] + all_domains,
+                                           capture_output=True, text=True, check=False)
+            if domain_result.returncode != 0:
+                log_error(f"Failed to set VPN domains: {domain_result.stderr.strip()}")
+                return False
+            log_success(f"Set {len(domains)} routing/search domains on tun0")
+        else:
+            log_info("No [search_domains] configured - skipping domain routing")
 
         verify = subprocess.run(["resolvectl", "status", "tun0"],
                                 capture_output=True, text=True, check=False)

@@ -10,7 +10,7 @@ alias vpn='python3 /path/to/vpn-automation/openconnect_pexpect.py'
 
 ## How it works
 
-The script uses [pexpect](https://pexpect.readthedocs.io/) to drive `openconnect` noninteractively. The protocol (Juniper NetConnect `nc`, Pulse Secure `pulse`, etc.) is set in `config/vpn.conf`. During the authentication handshake it:
+The script uses [pexpect](https://pexpect.readthedocs.io/) to drive `openconnect` noninteractively. During the authentication handshake it:
 
 1. Reads all settings from `config/vpn.conf`
 2. Retrieves the AD password (from a secret store or plain text in config)
