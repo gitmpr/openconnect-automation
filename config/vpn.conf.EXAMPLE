@@ -25,15 +25,20 @@ ad_username = jdoe@example.local
 # ad_password = your_password_here
 
 # Option B: shell command that prints the password to stdout (recommended)
-# The command is passed to bash -c, so subshells and pipes are supported.
+# The entire value after '=' is passed verbatim to /bin/sh -c, so spaces,
+# subshells $(...), and pipes work as normal. No quoting of the config value
+# itself is needed or supported -- quoting only applies within the command
+# where an argument contains spaces (e.g. bw get password "My Item").
+# See bash_commands/get_ad_password.sh for examples with other backends.
 ad_password_cmd = secret-tool lookup service ad username jdoe@example.local
 
 # --- TOTP: choose exactly one method ---
 
 # Option A: raw base32 TOTP secret; the script calls oathtool to generate the code
-# totp_secret = JBSWY3DPEHPK3PXP
+# totp_secret = YOUR_BASE32_SECRET
 
 # Option B: shell command that prints the current TOTP code (6-8 digits) to stdout
+# See bash_commands/get_totp_code.sh for examples with other backends.
 totp_code_cmd = oathtool --totp --base32 $(secret-tool lookup totp totp_vpn)
 
 [dns_servers]
