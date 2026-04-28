@@ -280,11 +280,17 @@ Exactly one key from group (A) and exactly one from group (B) must be set.
 | `primary` | yes | Primary VPN DNS server IP |
 | `secondary` | yes | Secondary VPN DNS server IP |
 
-**`[search_domains]` / `[routing_domains]`**
+**`[search_domains]`**
 
 | Key | Required | Description |
 |---|---|---|
-| `domains` | yes | Comma-separated list of corporate domains. `search_domains` sets DNS search suffixes; `routing_domains` forwards those domains to the VPN DNS via systemd-resolved (usually identical to each other) |
+| `domains` | no | Comma-separated corporate domains appended as DNS search suffixes on the VPN interface |
+
+**`[routing_domains]`**
+
+| Key | Required | Description |
+|---|---|---|
+| `domains` | no | Comma-separated domains forwarded to the VPN DNS server via systemd-resolved routing rules — usually the same list as `search_domains` |
 
 ## Files
 
