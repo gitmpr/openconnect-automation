@@ -301,6 +301,52 @@ Exactly one key from group (A) and exactly one from group (B) must be set.
 
 `config/vpn.conf` (your filled-in copy) is gitignored and never committed.
 
+## Android
+
+The same VPN server can be reached from Android using the OpenConnect app.
+
+- GitLab: <https://gitlab.com/openconnect/ics-openconnect>
+- F-Droid: <https://f-droid.org/packages/net.openconnect_vpn.android/>
+
+### TOTP configuration
+
+Set **Software token type** to **TOTP** in the VPN profile editor. The **Token string** field requires the base32 secret in a specific format that differs from what most tools accept:
+
+- The `base32:` prefix is mandatory. A bare secret without the prefix is treated as raw bytes and generates wrong codes.
+- The secret length must be a multiple of 8. If it is not, append `=` padding characters until it is. A 26-character secret needs 6 padding characters to reach 32.
+
+Example for a 26-character secret:
+
+```
+base32:YOURSECRETHERE======
+```
+
+To compute the padded token string from a secret stored in secret-tool:
+
+```bash
+secret=$(secret-tool lookup totp your_totp_key)
+len=${#secret}
+pad=$(( (8 - len % 8) % 8 ))
+printf 'base32:%s%s\n' "$secret" "$(printf '=%.0s' $(seq 1 $pad))"
+```
+
+Verify both ends generate the same code before connecting:
+
+```bash
+oathtool --totp --base32 "$secret"
+# compare with what the app shows in its token diagnostics screen
+```
+
+### User agent
+
+Some Ivanti/Pulse Secure deployments enforce device policies that block unrecognised clients. If connections fail after successful TOTP, the server may be rejecting the client type rather than the credentials. The app's **User agent** field (under advanced settings) can be set to match the desktop openconnect string:
+
+```
+Open AnyConnect VPN Agent v9.12-3.3
+```
+
+In practice, server-side policy may reject the connection regardless of user agent if the device does not pass a Host Checker requirement configured by the VPN admin.
+
 ## Security notes
 
 - `config/vpn.conf` is gitignored — your credentials stay local
