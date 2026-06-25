@@ -73,6 +73,40 @@ class FilteredOutput:
         sys.stdout.flush()
 
 
+# openconnect data-phase log lines that are pure per-packet noise during a
+# connected session (the tunnel keeps logging these as traffic flows). These
+# appear during child.interact(), not the auth handshake, so they are filtered
+# separately from the HTTP dump above. Kept narrow so genuine session events
+# (reconnects, DPD, errors) are never hidden.
+_INTERACT_NOISE = (
+    re.compile(rb'^(Incoming|Sending) KMP message \d+ of size \d+'),
+)
+
+
+class InteractFilter:
+    """output_filter for child.interact(): drop openconnect's data-phase noise.
+
+    pexpect always hands interact filters raw bytes (even with encoding set), so
+    this buffers by line and works on bytes. Unless debug is set, lines matching
+    _INTERACT_NOISE are dropped; everything else passes through unchanged.
+    """
+
+    def __init__(self, debug=False):
+        self.debug = debug
+        self._buf = b""
+
+    def __call__(self, data):
+        if self.debug:
+            return data
+        self._buf += data
+        out = []
+        while b'\n' in self._buf:
+            line, self._buf = self._buf.split(b'\n', 1)
+            if not any(p.search(line) for p in _INTERACT_NOISE):
+                out.append(line + b'\n')
+        return b"".join(out)
+
+
 def check_already_running():
     proc = subprocess.run(["pgrep", "-a", "openconnect"], capture_output=True, text=True, check=False)
     if proc.returncode == 0:
@@ -398,7 +432,7 @@ def main():
 
     try:
         child.logfile = None
-        child.interact()
+        child.interact(output_filter=InteractFilter(debug=args.debug))
 
     except KeyboardInterrupt:
         print(f"\n{Colors.YELLOW}[DISCONNECT]{Colors.END} Disconnecting VPN...")
