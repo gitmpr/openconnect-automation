@@ -8,6 +8,10 @@ Invoked via a shell alias, no manual input required once configured.
 alias vpn='python3 /path/to/openconnect-automation/openconnect_pexpect.py'
 ```
 
+Add `--debug` to a run (`vpn --debug`) to see the full openconnect HTTP traffic dump. Without it,
+that dump is hidden; locked-account, expired-password, and rejected-cookie detection work either
+way (pexpect matches the raw stream, not the displayed output).
+
 ## How it works
 
 The script uses [pexpect](https://pexpect.readthedocs.io/) to drive `openconnect` noninteractively. During the authentication handshake it:
@@ -248,8 +252,9 @@ alias vpn='python3 /path/to/openconnect-automation/openconnect_pexpect.py'
 ## Usage
 
 ```bash
-vpn      # connect — no prompts
-Ctrl+C   # disconnect and restore DNS
+vpn          # connect, no prompts
+vpn --debug  # connect, showing the full openconnect HTTP traffic dump
+Ctrl+C       # disconnect and restore DNS
 ```
 
 ## Configuration reference

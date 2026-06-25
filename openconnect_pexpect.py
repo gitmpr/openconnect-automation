@@ -7,6 +7,7 @@ OPENCONNECT_AUTOMATION_CONFIG environment variable).
 Credentials are retrieved either from the keyring (via a shell command)
 or from a plain-text value in the config file.
 """
+import argparse
 import pexpect
 import subprocess
 import sys
@@ -35,6 +36,41 @@ def log_info(msg):    print(f"{Colors.CYAN}[INFO] {msg}{Colors.END}", flush=True
 def log_warn(msg):    print(f"{Colors.YELLOW}[WARN] {msg}{Colors.END}", flush=True)
 def log_error(msg):   print(f"{Colors.RED}[ERROR] {msg}{Colors.END}", flush=True)
 def log_success(msg): print(f"{Colors.GREEN}[SUCCESS] {msg}{Colors.END}", flush=True)
+
+
+class FilteredOutput:
+    """Tee openconnect output to stdout.
+
+    The openconnect command always runs with --dump-http-traffic so that pexpect
+    can match the HTML body (locked account, expired password, rejected cookie).
+    That matching reads from child.before/buffer and is independent of this
+    logfile, so we can freely suppress the noisy HTTP dump lines from display.
+
+    Unless debug is set, dump lines (request lines '> ' and response lines '< ')
+    are dropped; openconnect's own progress lines pass through. With debug, every
+    line is shown.
+    """
+
+    def __init__(self, debug=False):
+        self.debug = debug
+        self._buf = ""
+
+    def _suppressed(self, line):
+        return not self.debug and (line.startswith('< ') or line.startswith('> '))
+
+    def write(self, data):
+        self._buf += data
+        while '\n' in self._buf:
+            line, self._buf = self._buf.split('\n', 1)
+            if not self._suppressed(line):
+                sys.stdout.write(line + '\n')
+        sys.stdout.flush()
+
+    def flush(self):
+        if self._buf and not self._suppressed(self._buf):
+            sys.stdout.write(self._buf)
+            self._buf = ""
+        sys.stdout.flush()
 
 
 def check_already_running():
@@ -198,11 +234,11 @@ def configure_vpn_dns(config):
     return True
 
 
-def send_masked(child, label, secret):
+def send_masked(child, label, secret, log_filter):
     print(f"\n{Colors.YELLOW}[INPUT] {label:<15}: {'*' * 8}{Colors.END}", flush=True)
     child.logfile = None
     child.sendline(secret)
-    child.logfile = sys.stdout
+    child.logfile = log_filter
 
 
 def parse_sessions(output):
@@ -226,6 +262,14 @@ def signal_handler(sig, frame):
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Noninteractive VPN connection via OpenConnect + pexpect.")
+    parser.add_argument(
+        "-d", "--debug", action="store_true",
+        help="Show the full openconnect HTTP traffic dump (verbose). "
+             "Locked-account / expired-password detection works either way.")
+    args = parser.parse_args()
+
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
@@ -256,11 +300,15 @@ def main():
     totp_code = get_totp_code(config)
     log_info("Retrieved TOTP code")
 
-    cmd = f"sudo {openconnect_bin} --protocol={protocol} -u {vpn_user} {vpn_server}"
+    # --dump-http-traffic is always on so pexpect can match the HTML body for
+    # locked-account / expired-password / rejected-cookie detection. The dump
+    # lines are suppressed from display unless --debug (see FilteredOutput).
+    cmd = f"sudo {openconnect_bin} --protocol={protocol} --dump-http-traffic -u {vpn_user} {vpn_server}"
     log_info(f"Connecting: {cmd}")
 
     child = pexpect.spawn(cmd, encoding='utf-8', timeout=30)
-    child.logfile = sys.stdout
+    log_filter = FilteredOutput(debug=args.debug)
+    child.logfile = log_filter
 
     try:
         while True:
@@ -277,13 +325,15 @@ def main():
                 r"p=passwordChange",                    # 9: Password change redirect
                 pexpect.EOF,                            # 10
                 pexpect.TIMEOUT,                        # 11
+                r"account was locked",                  # 12: TOTP account locked (HTML body)
+                r"Cookie was rejected",                 # 13: server rejected session cookie
             ], timeout=60)
 
             if index == 0:
-                send_masked(child, "AD password", ad_password)
+                send_masked(child, "AD password", ad_password, log_filter)
 
             elif index == 1:
-                send_masked(child, "TOTP code", totp_code)
+                send_masked(child, "TOTP code", totp_code, log_filter)
 
             elif index == 2:
                 output = child.before + child.after
@@ -325,6 +375,18 @@ def main():
                 log_warn("Timeout waiting for prompt - attempting DNS config anyway...")
                 configure_vpn_dns(config)
                 break
+
+            elif index == 12:
+                print()
+                log_error("Login failed - TOTP account is locked.")
+                restore_dns_state()
+                sys.exit(1)
+
+            elif index == 13:
+                print()
+                log_error("Server rejected the session cookie - authentication failed.")
+                restore_dns_state()
+                sys.exit(1)
 
     except KeyboardInterrupt:
         log_info("Interrupted during authentication.")
