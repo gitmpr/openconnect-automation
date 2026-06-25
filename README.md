@@ -1,18 +1,18 @@
-# vpn-automation
+# openconnect-automation
 
 Noninteractive VPN connection using [OpenConnect](https://www.infradead.org/openconnect/) with MFA (AD password + TOTP).
 
-Invoked via a shell alias — no manual input required once configured.
+Invoked via a shell alias, no manual input required once configured.
 
 ```bash
-alias vpn='python3 /path/to/vpn-automation/openconnect_pexpect.py'
+alias vpn='python3 /path/to/openconnect-automation/openconnect_pexpect.py'
 ```
 
 ## How it works
 
 The script uses [pexpect](https://pexpect.readthedocs.io/) to drive `openconnect` noninteractively. During the authentication handshake it:
 
-1. Reads all settings from `config/vpn.conf`
+1. Reads all settings from the config file (`~/.config/openconnect-automation/vpn.conf` by default)
 2. Retrieves the AD password (from a secret store or plain text in config)
 3. Generates a TOTP code (from a secret store or plain text secret in config)
 4. Feeds both to `openconnect` as it prompts for them
@@ -35,12 +35,16 @@ pip install pexpect
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/gitmpr/vpn-automation
-cd vpn-automation
-cp config/vpn.conf.EXAMPLE config/vpn.conf
+git clone https://github.com/gitmpr/openconnect-automation
+cd openconnect-automation
+mkdir -p ~/.config/openconnect-automation
+cp config/vpn.conf.EXAMPLE ~/.config/openconnect-automation/vpn.conf
 ```
 
-Edit `config/vpn.conf` and fill in:
+The script reads `~/.config/openconnect-automation/vpn.conf` by default. Override the location with
+the `OPENCONNECT_AUTOMATION_CONFIG` environment variable if you keep it elsewhere.
+
+Edit the config file and fill in:
 - Your VPN portal URL and username
 - Your DNS servers and search domains
 - Your credential retrieval method (see below)
@@ -90,7 +94,7 @@ Compare the output against what your authenticator app shows for the same accoun
 
 ### 3. Credential retrieval
 
-All credentials are configured in `config/vpn.conf` under `[credentials]`. Choose a backend for the AD password and for the TOTP secret — they can be different backends.
+All credentials are configured in your config file under `[credentials]`. Choose a backend for the AD password and for the TOTP secret — they can be different backends.
 
 The `ad_password_cmd` and `totp_code_cmd` values are passed verbatim to `/bin/sh -c`, exactly as if typed in a terminal. Spaces, subshells `$(...)`, and pipes work as normal. No quoting of the config value itself is needed or supported — quoting only applies inside the command where an argument contains spaces (e.g. `bw get password "My Item"`).
 
@@ -114,7 +118,7 @@ secret-tool store --label='VPN TOTP' totp totp_vpn
 secret-tool lookup totp totp_vpn
 ```
 
-In `config/vpn.conf`:
+In your config file:
 
 ```ini
 [credentials]
@@ -140,7 +144,7 @@ bw get totp "VPN AD Password"
 bw get item "VPN TOTP" | jq -r '.fields[] | select(.name=="secret") | .value' | xargs oathtool --totp --base32
 ```
 
-In `config/vpn.conf`:
+In your config file:
 
 ```ini
 [credentials]
@@ -167,7 +171,7 @@ kwallet-query -w "VPN TOTP" -f vpn kdewallet
 kwallet-query -r "VPN TOTP" -f vpn kdewallet
 ```
 
-In `config/vpn.conf`:
+In your config file:
 
 ```ini
 [credentials]
@@ -192,7 +196,7 @@ pass insert vpn/totp-secret
 pass show vpn/totp-secret
 ```
 
-In `config/vpn.conf`:
+In your config file:
 
 ```ini
 [credentials]
@@ -206,7 +210,7 @@ totp_code_cmd   = oathtool --totp --base32 $(pass show vpn/totp-secret)
 Simplest to set up. Restrict file permissions to keep the secret off-limits to other users.
 
 ```bash
-chmod 600 config/vpn.conf
+chmod 600 ~/.config/openconnect-automation/vpn.conf
 ```
 
 ```ini
@@ -238,7 +242,7 @@ sudo visudo -f /etc/sudoers.d/openconnect
 Add to `~/.bashrc` or `~/.zshrc`:
 
 ```bash
-alias vpn='python3 /path/to/vpn-automation/openconnect_pexpect.py'
+alias vpn='python3 /path/to/openconnect-automation/openconnect_pexpect.py'
 ```
 
 ## Usage
@@ -250,7 +254,9 @@ Ctrl+C   # disconnect and restore DNS
 
 ## Configuration reference
 
-`config/vpn.conf` is the single source of truth for all environment-specific settings.
+The config file (`~/.config/openconnect-automation/vpn.conf` by default, or wherever
+`OPENCONNECT_AUTOMATION_CONFIG` points) is the single source of truth for all environment-specific
+settings.
 
 **`[vpn]`**
 
@@ -297,9 +303,11 @@ Exactly one key from group (A) and exactly one from group (B) must be set.
 | File | Purpose |
 |---|---|
 | `openconnect_pexpect.py` | Main connection script |
-| `config/vpn.conf.EXAMPLE` | Config template — copy to `vpn.conf` and fill in |
+| `config/vpn.conf.EXAMPLE` | Config template, copy to `~/.config/openconnect-automation/vpn.conf` and fill in |
 
-`config/vpn.conf` (your filled-in copy) is gitignored and never committed.
+Your filled-in config lives outside the repo at `~/.config/openconnect-automation/vpn.conf`, so
+credentials are never inside the cloned repo. (`config/vpn.conf` remains gitignored should you keep
+a local copy there and point `OPENCONNECT_AUTOMATION_CONFIG` at it.)
 
 ## Android
 
@@ -349,7 +357,7 @@ In practice, server-side policy may reject the connection regardless of user age
 
 ## Security notes
 
-- `config/vpn.conf` is gitignored — your credentials stay local
-- If you store a plain-text password in the config, run `chmod 600 config/vpn.conf`
+- The config lives at `~/.config/openconnect-automation/vpn.conf`, outside the repo, so credentials stay local
+- If you store a plain-text password in the config, run `chmod 600 ~/.config/openconnect-automation/vpn.conf`
 - The keyring approach keeps secrets off disk entirely
 - The sudoers rule should be scoped to `/usr/sbin/openconnect` only

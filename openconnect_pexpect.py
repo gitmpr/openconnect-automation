@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
 Noninteractive VPN connection via OpenConnect + pexpect.
-All site-specific settings are read from config/vpn.conf.
+All site-specific settings are read from a config file, by default
+~/.config/openconnect-automation/vpn.conf (override with the
+OPENCONNECT_AUTOMATION_CONFIG environment variable).
 Credentials are retrieved either from the keyring (via a shell command)
 or from a plain-text value in the config file.
 """
@@ -15,8 +17,9 @@ import configparser
 import time
 from pathlib import Path
 
-SCRIPT_DIR = Path(__file__).parent
-CONFIG_FILE = SCRIPT_DIR / "config" / "vpn.conf"
+CONFIG_FILE = Path(os.environ.get(
+    "OPENCONNECT_AUTOMATION_CONFIG",
+    Path.home() / ".config" / "openconnect-automation" / "vpn.conf"))
 
 
 class Colors:
